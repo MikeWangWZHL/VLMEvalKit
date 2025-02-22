@@ -1,0 +1,20 @@
+{
+    "model": {
+        "analysis_finetuned-to-no-merge__datacomp_tome_1e-6_model_ViT-B-16-SigLIP-384-tome-192out_evalmode": {
+            "class": "LLaVATome",
+            "model_path": "/shared/nas2/wangz3/salesforce_intern_nas2/open_clip_merging/LLaVA/checkpoints/shared_by_senthil/tome_models_share/datacomp_tome_1e-6_model_ViT-B-16-SigLIP-384-tome-192out_evalmode/tome_llava-v1.5-7b-stage2",
+            "tome_kwargs": {
+                "pretrained": "/shared/nas2/wangz3/salesforce_intern_nas2/open_clip_merging/LLaVA/checkpoints/shared_by_senthil/tome_models_share/datacomp_tome_1e-6_model_ViT-B-16-SigLIP-384-tome-192out_evalmode/vision_checkpoint/epoch_9.pt", 
+                "pretrained_origin_tag": "webli", 
+                "r_total":0, 
+                "specified_thresholds":[1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0]
+            }
+        }
+    },
+    "data": {
+        "MME": {
+            "class": "ImageYORNDataset",
+            "dataset": "MME"
+        }
+    }
+}

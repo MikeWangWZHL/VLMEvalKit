@@ -1,3 +1,17 @@
+# Eval Tome Llava Model instructions
+
+## Example scripts
+- The scripts takes a json config file as input for specifying the configs; it can eval multiple models and multiple datasets within one run. You can find some example config files for Tome models in `run_configs/`; Here is an example script for running eval with tome llava models:
+  ```
+  bash run_example_tome.sh
+  ```
+
+## Explanation for the change
+- Basically I added a LLaVATome model class in `VLMEvalKit/vlmeval/vlm/llava/llava.py`; this assumes that we installed our updated llava package from "https://github.com/MikeWangWZHL/LLaVA_clip_merging.git"
+- To add a new custom model I followed this instruction: [Development_Guide](/docs/en/Development.md)
+
+---
+---
 ![LOGO](http://opencompass.openxlab.space/utils/MMLB.jpg)
 
 <b>A Toolkit for Evaluating Large Vision-Language Models. </b>
