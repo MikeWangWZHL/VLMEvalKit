@@ -2,10 +2,10 @@
     "model": {
         "NoFinetune_OpenAI-VIT-L_ToME_72out_linear_LLaVA_7b": {
             "class": "LLaVATome",
-            "model_path": "/export/home/spurushwalkam/reps/open_clip_merging/LLaVA/tome_models_share/nofinetune_models/llava/nofinetune_ViT-L-14-336-tome-72out-linear_7b_llava/stage2_ft",
+            "model_path": "/shared/nas2/wangz3/salesforce_intern_nas2/open_clip_merging/LLaVA/checkpoints/shared_by_senthil/tome_models_share/nofinetune_models/llava/nofinetune_ViT-L-14-336-tome-72out-linear_7b_llava/tome_llava_stage2_ft",
             "tome_kwargs": {
-                "pretrained": "/export/home/spurushwalkam/reps/open_clip_merging/LLaVA/tome_models_share/nofinetune_models/threshold_checkpoints/ViT-L-14-336-tome-72out-linear.pth", 
-                "pretrained_origin_tag": "webli"
+                "pretrained": "/shared/nas2/wangz3/salesforce_intern_nas2/open_clip_merging/LLaVA/checkpoints/shared_by_senthil/tome_models_share/nofinetune_models/threshold_checkpoints/ViT-L-14-336-tome-72out-linear.pth", 
+                "pretrained_origin_tag": "openai"
             }
         }
     },
