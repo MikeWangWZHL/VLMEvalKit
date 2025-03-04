@@ -340,13 +340,18 @@ def main():
                         if listinstr(['WeMath'], dataset_name):
                             judge_kwargs['model'] = 'gpt-4o-mini'
                         else:
-                            judge_kwargs['model'] = 'chatgpt-0125'
+                            # judge_kwargs['model'] = 'chatgpt-0125'
+                            judge_kwargs['model'] = 'gpt-4o-mini'
                     elif listinstr(['MMVet', 'LLaVABench', 'MMBench-Video'], dataset_name):
-                        judge_kwargs['model'] = 'gpt-4-turbo'
+                        # judge_kwargs['model'] = 'gpt-4-turbo'
+                        judge_kwargs['model'] = 'gpt-4o-mini'
                     elif listinstr(['MathVista', 'MathVerse', 'MathVision', 'DynaMath', 'VL-RewardBench', 'LogicVista'], dataset_name):  # noqa: E501
                         judge_kwargs['model'] = 'gpt-4o-mini'
                     elif listinstr(['MMLongBench', 'MMDU', 'DUDE', 'SLIDEVQA', 'MIA-Bench', 'WildVision'], dataset_name):  # noqa: E501
                         judge_kwargs['model'] = 'gpt-4o'
+                    else:
+                        judge_kwargs['model'] = 'gpt-4o-mini' # set default
+                    print("Using judge:", judge_kwargs['model'])
 
                 if rank == 0:
                     logger.info(judge_kwargs)

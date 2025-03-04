@@ -235,7 +235,7 @@ Respond with only the letter (A, B, C, or D) of the correct option.
 
         if not osp.exists(score_file):
             model = judge_kwargs.get('model', 'exact_matching')
-            assert model in ['chatgpt-0125', 'exact_matching', 'gpt-4-0125']
+            assert model in ['chatgpt-0125', 'exact_matching', 'gpt-4-0125', 'gpt-4o-mini']
 
             if model == 'exact_matching':
                 model = None

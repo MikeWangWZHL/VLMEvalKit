@@ -986,6 +986,306 @@ class LLaVA_OneVision(BaseModel):
             return self.generate_inner_image(message, dataset)
 
 
+
+
+### Llava-onevision customized model ###
+class LLaVA_OneVisionTome(BaseModel):
+    INSTALL_REQ = True
+    INTERLEAVE = True
+    VIDEO_LLM = True
+    DEFAULT_IMAGE_TOKEN = "<image>"
+    IMAGE_TOKEN_INDEX = -200
+
+    # This function is used to split InternVL2-Llama3-76B
+    def split_model(self, model_path):
+        import math
+
+        device_map = {}
+        num_gpus = torch.cuda.device_count()
+        rank, world_size = get_rank_and_world_size()
+        num_gpus = num_gpus // world_size
+        if "72b" not in model_path.lower():
+            return None
+        # embed_tokens, vision_tower, mm_projector, lm_head are treated as 2 layers
+        num_layers = 80 + 8
+        num_layers_per_gpu = math.ceil(num_layers / num_gpus)
+        num_layers_per_gpu = [num_layers_per_gpu] * num_gpus
+        num_layers_per_gpu[0] -= 6
+        num_layers_per_gpu[-1] -= 2
+        layer_cnt = 0
+        for i, num_layer in enumerate(num_layers_per_gpu):
+            for j in range(num_layer):
+                device_map[f"model.layers.{layer_cnt}"] = rank + world_size * i
+                layer_cnt += 1
+        last_gpu = rank + world_size * (num_gpus - 1)
+        device_map["model.image_newline"] = rank
+        device_map["model.embed_tokens"] = rank
+        device_map["model.norm"] = rank
+        device_map["model.vision_tower"] = rank
+        device_map["model.vision_resampler"] = rank
+        device_map["model.mm_projector"] = rank
+        device_map["lm_head"] = last_gpu
+        return device_map
+
+    def __init__(self, model_path="lmms-lab/llava-onevision-qwen2-7b-si", **kwargs):
+        assert model_path is not None
+        try:
+            import llava
+            print("current llava path:", llava.__file__)
+            print("Make sure you are using the llava-next environment with: https://github.com/MikeWangWZHL/LLaVA-Next-tome")
+            from llava.model.builder import load_pretrained_model
+            from llava.conversation import conv_templates, SeparatorStyle
+            from llava.mm_utils import (
+                get_model_name_from_path,
+                process_images,
+                tokenizer_image_token,
+                KeywordsStoppingCriteria,
+            )  # noqa: E501
+        except Exception as err:
+            logging.critical(
+                "Please install `https://github.com/MikeWangWZHL/LLaVA-Next-tome`"
+            )
+            raise err
+
+        video_kwargs_default = dict(
+            overwrite=True, mm_spatial_pool_mode="average", force_sample=True
+        )
+        video_kwargs_default.update(kwargs)
+        self.video_kwargs = video_kwargs_default
+
+        overwrite_config = None
+        if "video" in model_path.lower():
+            if self.video_kwargs["overwrite"]:
+                overwrite_config = {}
+                overwrite_config["mm_spatial_pool_mode"] = self.video_kwargs[
+                    "mm_spatial_pool_mode"
+                ]
+        
+        rank, world_size = get_rank_and_world_size()
+        model_name = get_model_name_from_path(model_path)
+        device_map = self.split_model(model_path)
+
+        tome_kwargs = kwargs.pop("tome_kwargs", None)
+        if tome_kwargs is not None:
+            if overwrite_config is None:
+                overwrite_config = {}
+            for key, value in tome_kwargs.items():
+                overwrite_config[key] = value
+
+        if device_map is None:
+            if auto_split_flag():
+                assert world_size == 1, 'Only support world_size == 1 when AUTO_SPLIT set for non-72B LLaVA-OneVision'
+                logging.warning('Currently, we only support to split the non-72B model across all GPUs.')
+                tokenizer, model, image_processor, _ = load_pretrained_model(
+                    model_path,
+                    None,
+                    model_name,
+                    tome_kwargs=None,
+                    device_map="auto",
+                    overwrite_config=overwrite_config,
+                )
+            else:
+                tokenizer, model, image_processor, _ = load_pretrained_model(
+                    model_path,
+                    None,
+                    model_name,
+                    tome_kwargs=None,
+                    device_map="cpu",
+                    overwrite_config=overwrite_config,
+                )
+                model.cuda()
+        else:
+            tokenizer, model, image_processor, _ = load_pretrained_model(
+                model_path,
+                None,
+                model_name,
+                tome_kwargs=None,
+                device_map=device_map,
+                overwrite_config=overwrite_config,
+            )
+        model.eval()
+        model.tie_weights()
+
+        if "llava" in model_path.lower():
+            conv_mode = "qwen_1_5"
+        if 'llava-video' in model_path.lower():
+            self.nframe = 64
+        else:
+            self.nframe = 16
+            if "72b" in model_path.lower():
+                self.nframe = 32
+
+        if "video" in model_path.lower():
+            self.force_sample = self.video_kwargs["force_sample"]
+        else:
+            self.force_sample = False
+
+        self.conv_template = conv_mode
+        self.conv_templates = conv_templates
+        self.tokenizer = tokenizer
+        self.model = model
+        self.image_processor = image_processor
+        self.tokenizer_image_token = tokenizer_image_token
+        self.process_images = (
+            process_images  # Store process_images as a class attribute
+        )
+        self.KeywordStoppingCriteria = KeywordsStoppingCriteria
+        self.SeparatorStyle = SeparatorStyle
+
+    def generate_inner_image(self, message, dataset=None):
+        content, images = "", []
+        image_sizes = []  # Store image sizes
+
+        for msg in message:
+            if msg["type"] == "text":
+                content += msg["value"]
+            else:
+                img = Image.open(msg["value"]).convert("RGB")
+                images.append(img)
+                image_sizes.append(img.size)  # Store the size of each image
+                content += self.DEFAULT_IMAGE_TOKEN + "\n"
+
+        # Process images using the class attribute self.process_images
+        image_tensor = self.process_images(
+            images, self.image_processor, self.model.config
+        )
+        image_tensor = [
+            _image.to(dtype=torch.float16, device="cuda") for _image in image_tensor
+        ]
+
+        conv = copy.deepcopy(self.conv_templates[self.conv_template])
+        conv.append_message(conv.roles[0], content)
+        conv.append_message(conv.roles[1], None)
+        prompt_question = conv.get_prompt()
+
+        input_ids = self.tokenizer_image_token(
+            prompt_question, self.tokenizer, self.IMAGE_TOKEN_INDEX, return_tensors="pt"
+        )
+        input_ids = input_ids.unsqueeze(0).cuda()
+
+        stop_str = conv.sep if conv.sep_style != self.SeparatorStyle.TWO else conv.sep2
+        keywords = [stop_str]
+        stopping_criteria = self.KeywordStoppingCriteria(
+            keywords, self.tokenizer, input_ids
+        )
+
+        # Pass image sizes along with other parameters
+        cont = self.model.generate(
+            input_ids,
+            images=image_tensor,
+            image_sizes=image_sizes,  # Pass the image sizes here
+            do_sample=False,
+            temperature=0,
+            max_new_tokens=2048,
+            stopping_criteria=[stopping_criteria],
+        )
+        text_outputs = self.tokenizer.batch_decode(cont, skip_special_tokens=True)[0]
+        return text_outputs
+
+    def generate_inner_video(self, message, dataset=None):
+        content, text_content, visual_content, videos = "", "", "", []
+
+        for msg in message:
+            if msg["type"] == "text":
+                text_content += msg["value"]
+            else:
+                videos.append(msg["value"])
+                visual_content += self.DEFAULT_IMAGE_TOKEN + "\n"
+
+        if len(videos) > 1:
+            raise ValueError(
+                "LLaVA-OneVision does not support multiple videos as input."
+            )
+
+        video_frames, frame_time, video_time = self.load_video(
+            videos[0], self.nframe, self.force_sample
+        )
+
+        time_instruciton = (
+            f"The video lasts for {video_time:.2f} seconds,"
+            f"and {len(video_frames[0])} frames are uniformly sampled from it."
+            f"These frames are located at {frame_time}."
+            f"Please answer the following questions related to this video.\n"
+        )
+
+        if self.force_sample:
+            content = visual_content + time_instruciton + text_content
+        else:
+            content = visual_content + text_content
+
+        image_tensors = []
+        frames = (
+            self.image_processor.preprocess(video_frames, return_tensors="pt")[
+                "pixel_values"
+            ]
+            .half()
+            .cuda()
+        )
+        image_tensors.append(frames)
+
+        conv = copy.deepcopy(self.conv_templates[self.conv_template])
+        conv.append_message(conv.roles[0], content)
+        conv.append_message(conv.roles[1], None)
+        prompt_question = conv.get_prompt()
+
+        input_ids = self.tokenizer_image_token(
+            prompt_question, self.tokenizer, self.IMAGE_TOKEN_INDEX, return_tensors="pt"
+        )
+        input_ids = input_ids.unsqueeze(0).cuda()
+        image_sizes = [frame.size for frame in video_frames]
+        modalities = ["video"] * len(video_frames)
+
+        stop_str = conv.sep if conv.sep_style != self.SeparatorStyle.TWO else conv.sep2
+        keywords = [stop_str]
+        stopping_criteria = self.KeywordStoppingCriteria(
+            keywords, self.tokenizer, input_ids
+        )
+
+        # Pass image sizes along with other parameters
+        cont = self.model.generate(
+            input_ids,
+            images=image_tensors,
+            image_sizes=image_sizes,  # Pass the image sizes here
+            do_sample=False,
+            temperature=0,
+            max_new_tokens=2048,
+            modalities=modalities,
+            stopping_criteria=[stopping_criteria],
+        )
+        text_outputs = self.tokenizer.batch_decode(cont, skip_special_tokens=True)[0]
+        return text_outputs
+
+    def load_video(self, video_path, max_frames_num, force_sample=False, fps=1):
+        from decord import VideoReader, cpu
+        import numpy as np
+
+        if max_frames_num == 0:
+            return np.zeros((1, 336, 336, 3))
+        vr = VideoReader(video_path, ctx=cpu(0), num_threads=1)
+        total_frame_num = len(vr)
+        video_time = total_frame_num / vr.get_avg_fps()
+        fps = round(vr.get_avg_fps() / fps)
+        frame_idx = [i for i in range(0, len(vr), fps)]
+        frame_time = [i / fps for i in frame_idx]
+        if len(frame_idx) > max_frames_num or force_sample:
+            sample_fps = max_frames_num
+            uniform_sampled_frames = np.linspace(
+                0, total_frame_num - 1, sample_fps, dtype=int
+            )
+            frame_idx = uniform_sampled_frames.tolist()
+            frame_time = [i / vr.get_avg_fps() for i in frame_idx]
+        frame_time = ",".join([f"{i:.2f}s" for i in frame_time])
+        spare_frames = vr.get_batch(frame_idx).asnumpy()
+        # import pdb;pdb.set_trace()
+        return spare_frames, frame_time, video_time
+
+    def generate_inner(self, message, dataset=None):
+        if DATASET_MODALITY(dataset) == 'VIDEO':
+            return self.generate_inner_video(message, dataset)
+        else:
+            return self.generate_inner_image(message, dataset)
+### 
+
 class LLaVA_OneVision_HF(BaseModel):
     INSTALL_REQ = True
     INTERLEAVE = True

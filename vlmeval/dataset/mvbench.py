@@ -365,7 +365,7 @@ Based on your observations, select the best option that accurately addresses the
 
         if not osp.exists(score_file):
             model = judge_kwargs.setdefault('model', 'chatgpt-0125')
-            assert model in ['chatgpt-0125', 'exact_matching', 'gpt-4-0125']
+            assert model in ['chatgpt-0125', 'exact_matching', 'gpt-4-0125', 'gpt-4o-mini']
 
             if model == 'exact_matching':
                 model = None
