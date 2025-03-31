@@ -1,0 +1,18 @@
+{
+    "model": {
+        "test": {
+            "class": "LLaVA_OneVisionTome",
+            "model_path": "/shared/nas2/wangz3/salesforce_intern_nas2/open_clip_merging/LLaVA-NeXT/checkpoints/original_llava_ov_for_tome/llava-onevision-qwen2-7b-si_for_tome",
+            "tome_kwargs": {
+                "r_total": 648,
+                "r_schedule": "constant",
+                "merge_mode": "instance_level",
+                "set_training_mode": true,
+                "repeat_merged_tokens": true
+            }
+        }
+    },
+    "data": {
+        "Video-MME_8frame": {}
+    }
+}

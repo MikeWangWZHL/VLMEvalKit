@@ -1,0 +1,22 @@
+{
+    "model": {
+        "test": {
+            "class": "LLaVA_OneVisionTome",
+            "model_path": "/shared/nas2/wangz3/salesforce_intern_nas2/open_clip_merging/LLaVA-NeXT/checkpoints/original_llava_ov_for_tome/llava-onevision-qwen2-7b-si_for_tome",
+            "tome_kwargs": {
+                "r_total": 648,
+                "r_schedule": "constant",
+                "merge_mode": "batch_level",
+                "set_training_mode": false,
+                "repeat_merged_tokens": true,
+                "specified_thresholds": [1.0, 0.99609375, 0.94140625, 0.94140625, 0.91015625, 0.94140625, 0.91015625, 0.94140625, 0.94140625, 0.91015625, 0.91015625, 0.91015625, 0.91015625, 0.91015625, 0.91015625, 0.91015625, 0.91015625, 0.91015625, 0.91015625, 0.87890625, 0.87890625, 0.87890625, 0.87890625, 0.84765625, 0.84765625, 0.81640625, 0.81640625]
+            }
+        }
+    },
+    "data": {
+        "MMMU_DEV_VAL": {
+            "class": "MMMUDataset",
+            "dataset": "MMMU_DEV_VAL"
+        }
+    }
+}
